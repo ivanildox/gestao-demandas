@@ -1,12 +1,12 @@
 # =====================================================================
-# Script de Compilação e Testes do Sistema Gestão de Demandas (Rust + Tauri v2)
+# Script de Compilação e Testes do Sistema Gestão de Demandas (Rust + egui)
 # =====================================================================
 
 $raiz = Split-Path -Parent $PSScriptRoot
 Set-Location $raiz
 
 Write-Host "=================================================================" -ForegroundColor Cyan
-Write-Host " Gestão de Demandas - Build & Setup Rust + Tauri" -ForegroundColor Cyan
+Write-Host " Gestão de Demandas - Build & Setup Rust + egui" -ForegroundColor Cyan
 Write-Host "=================================================================" -ForegroundColor Cyan
 
 # Configura o PATH com o compilador Rust e ferramentas binutils
