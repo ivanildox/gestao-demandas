@@ -59,7 +59,6 @@ powershell -ExecutionPolicy Bypass -File scripts\criar_atalho_desktop.ps1
 | `src-tauri/icons/` | Ícones oficiais da aplicação (`.ico` multi-resolução e `.png`) |
 | `vba/ExportarParaGestao.bas` | Macro do Outlook para envio de e-mails à fila |
 | `dados/` | Banco de dados local (`gestao.db`), `anexos/`, `inbox/` e `relatorios/` |
-| `docs/estudo_migracao_rust.md` | Estudo detalhado de viabilidade técnica da conversão para Rust |
 
 ---
 
