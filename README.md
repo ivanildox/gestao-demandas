@@ -16,8 +16,23 @@ O sistema inclui controle de anexos por demanda, histórico completo de auditori
 
 O sistema é distribuído como um único arquivo executável nativo do Windows, sem instalador e sem dependências externas:
 
+- **Download pronto**: baixe o `gestao_demandas.exe` mais recente na aba [Releases](../../releases) do repositório.
 - **Atalho na Área de Trabalho**: Um atalho **"Gestão de Demandas"** pode ser criado na Área de Trabalho com o ícone oficial do programa.
-- **Executável Direto**: `gestao_demandas.exe` na raiz do projeto.
+- **Executável Direto**: `gestao_demandas.exe` na raiz do projeto (após compilar localmente).
+
+### Build e releases automatizados
+
+O repositório tem dois workflows de GitHub Actions (`.github/workflows/`):
+
+- **CI** (`ci.yml`): roda `cargo check` e `cargo test` a cada push/PR na `main`, usando o toolchain MSVC (já disponível nos runners `windows-latest`, sem precisar de configuração extra).
+- **Release** (`release.yml`): ao criar uma tag no padrão `v*.*.*` (ex.: `v0.3.0`), compila o projeto em modo release e publica o `gestao_demandas.exe` automaticamente como anexo da Release correspondente no GitHub.
+
+Para publicar uma nova versão:
+
+```powershell
+git tag v0.3.0
+git push origin v0.3.0
+```
 
 Para recriar o atalho da Área de Trabalho caso necessário:
 
