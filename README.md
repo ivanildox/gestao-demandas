@@ -20,6 +20,8 @@ O sistema é distribuído como um único arquivo executável nativo do Windows, 
 - **Atalho na Área de Trabalho**: Um atalho **"Gestão de Demandas"** pode ser criado na Área de Trabalho com o ícone oficial do programa.
 - **Executável Direto**: `gestao_demandas.exe` na raiz do projeto (após compilar localmente).
 
+> **Interface**: a janela principal abre **maximizada**, ocupando toda a área de trabalho. A tela inicial é dividida em duas: a **relação de demandas** na parte de cima (1/4 da altura) e o **detalhamento da demanda selecionada** — prazo interno, prazo externo e entregável esperado — na parte de baixo (3/4). A edição é aberta pelo botão **Editar** na primeira coluna da tabela (clicar na linha apenas seleciona o registro). As telas de cadastro/edição são exibidas **centralizadas** na tela.
+
 ### Build e releases automatizados
 
 O repositório tem dois workflows de GitHub Actions (`.github/workflows/`):

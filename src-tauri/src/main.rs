@@ -28,7 +28,9 @@ fn main() -> eframe::Result<()> {
     let mut viewport = egui::ViewportBuilder::default()
         .with_title("Gestão de Demandas")
         .with_inner_size([1280.0, 820.0])
-        .with_min_inner_size([960.0, 640.0]);
+        .with_min_inner_size([960.0, 640.0])
+        // Abre a interface já maximizada, ocupando toda a área de trabalho.
+        .with_maximized(true);
 
     if let Some(icone) = icone {
         viewport = viewport.with_icon(icone);
@@ -44,6 +46,14 @@ fn main() -> eframe::Result<()> {
         opcoes_janela,
         Box::new(|cc| {
             cc.egui_ctx.set_visuals(egui::Visuals::light());
+
+            // O winit aplica o tamanho inicial da janela logo após criá-la e,
+            // ao fazer isso, cancela a maximização. Por isso reenviamos o
+            // comando de maximizar assim que a janela existir, garantindo que
+            // a interface abra ocupando toda a área de trabalho.
+            cc.egui_ctx
+                .send_viewport_cmd(egui::ViewportCommand::Maximized(true));
+
             Ok(Box::new(app_ui::GestaoDemandasApp::new(cc)))
         }),
     )

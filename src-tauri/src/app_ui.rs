@@ -30,9 +30,17 @@ fn cor_status(status: &str) -> egui::Color32 {
 
 /// Pinta o fundo da célula atual com a cor indicada, preenchendo todo o
 /// retângulo disponível antes de desenhar o conteúdo por cima.
-fn pintar_fundo_celula(ui: &mut egui::Ui, cor: egui::Color32) {
+/// Linhas selecionadas recebem um tom azul por cima da cor de status.
+fn pintar_fundo_celula(ui: &mut egui::Ui, cor: egui::Color32, selecionada: bool) {
     if cor != egui::Color32::TRANSPARENT {
         ui.painter().rect_filled(ui.max_rect(), 0.0, cor);
+    }
+    if selecionada {
+        ui.painter().rect_filled(
+            ui.max_rect(),
+            0.0,
+            egui::Color32::from_rgba_unmultiplied(13, 110, 253, 60),
+        );
     }
 }
 
@@ -215,6 +223,8 @@ pub struct GestaoDemandasApp {
     estatisticas: Estatisticas,
     modal: Option<ModalDemanda>,
     toasts: Vec<Toast>,
+    /// Demanda atualmente selecionada na tabela (detalhada no painel inferior).
+    demanda_selecionada: Option<i64>,
 }
 
 impl GestaoDemandasApp {
@@ -249,6 +259,7 @@ impl GestaoDemandasApp {
             },
             modal: None,
             toasts: Vec::new(),
+            demanda_selecionada: None,
         };
         app.recarregar_tudo();
         app
@@ -443,30 +454,28 @@ impl GestaoDemandasApp {
 
     // ---------- Desenho da UI ----------
 
-    fn desenhar_header(&mut self, ctx: &egui::Context) {
-        egui::TopBottomPanel::top("header").show(ctx, |ui| {
-            ui.add_space(6.0);
-            ui.horizontal(|ui| {
-                ui.heading("📋 Gestão de Demandas");
-                ui.add_space(16.0);
-                if ui.button("➕ Nova Demanda").clicked() {
-                    self.abrir_modal_nova();
-                }
-                if ui.button("📥 Importar E-mails").clicked() {
-                    self.importar_inbox();
-                }
-                if ui.button("📊 Relatório HTML").clicked() {
-                    self.gerar_relatorio_html();
-                }
-                if ui.button("📄 Exportar CSV").clicked() {
-                    self.exportar_csv();
-                }
-                if ui.button("🔄 Recarregar").clicked() {
-                    self.recarregar_tudo();
-                }
-            });
-            ui.add_space(6.0);
+    fn desenhar_header(&mut self, ui: &mut egui::Ui) {
+        ui.add_space(6.0);
+        ui.horizontal(|ui| {
+            ui.heading("📋 Gestão de Demandas");
+            ui.add_space(16.0);
+            if ui.button("➕ Nova Demanda").clicked() {
+                self.abrir_modal_nova();
+            }
+            if ui.button("📥 Importar E-mails").clicked() {
+                self.importar_inbox();
+            }
+            if ui.button("📊 Relatório HTML").clicked() {
+                self.gerar_relatorio_html();
+            }
+            if ui.button("📄 Exportar CSV").clicked() {
+                self.exportar_csv();
+            }
+            if ui.button("🔄 Recarregar").clicked() {
+                self.recarregar_tudo();
+            }
         });
+        ui.add_space(6.0);
     }
 
     fn desenhar_estatisticas(&mut self, ui: &mut egui::Ui) {
@@ -560,12 +569,14 @@ impl GestaoDemandasApp {
 
     fn desenhar_tabela(&mut self, ui: &mut egui::Ui) {
         let mut id_para_editar: Option<i64> = None;
+        let mut id_para_selecionar: Option<i64> = None;
 
         TableBuilder::new(ui)
             .striped(true)
             .resizable(true)
             .sense(egui::Sense::click())
             .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+            .column(Column::auto().at_least(64.0))
             .column(Column::remainder().at_least(180.0))
             .column(Column::auto().at_least(110.0))
             .column(Column::auto().at_least(90.0))
@@ -574,10 +585,10 @@ impl GestaoDemandasApp {
             .column(Column::auto().at_least(110.0))
             .column(Column::auto().at_least(130.0))
             .column(Column::auto().at_least(90.0))
-            .column(Column::auto().at_least(90.0))
             .column(Column::auto().at_least(100.0))
             .header(22.0, |mut header| {
                 for titulo in [
+                    "",
                     "Título",
                     "Ente",
                     "Tipo",
@@ -586,7 +597,6 @@ impl GestaoDemandasApp {
                     "Responsável",
                     "Processo SEI",
                     "Recebido",
-                    "Prazo",
                     "Situação",
                 ] {
                     header.col(|ui| {
@@ -606,47 +616,60 @@ impl GestaoDemandasApp {
 
                 for d in self.demandas.clone() {
                     let cor_fundo = cor_status(&d.status);
+                    let selecionada = self.demanda_selecionada == d.id;
                     body.row(26.0, |mut row| {
+                        // Botão de edição: abre a tela de edição do registro.
                         row.col(|ui| {
-                            pintar_fundo_celula(ui, cor_fundo);
+                            pintar_fundo_celula(ui, cor_fundo, selecionada);
+                            let botao = egui::Button::new(
+                                egui::RichText::new("Editar").color(egui::Color32::WHITE),
+                            )
+                            .fill(egui::Color32::from_rgb(40, 167, 69))
+                            .small();
+                            if ui
+                                .add(botao)
+                                .on_hover_text("Abrir a tela de edição desta demanda")
+                                .clicked()
+                            {
+                                id_para_editar = Some(d.id.unwrap_or(0));
+                            }
+                        });
+                        row.col(|ui| {
+                            pintar_fundo_celula(ui, cor_fundo, selecionada);
                             ui.label(&d.titulo);
                         });
                         row.col(|ui| {
-                            pintar_fundo_celula(ui, cor_fundo);
+                            pintar_fundo_celula(ui, cor_fundo, selecionada);
                             ui.label(&d.ente);
                         });
                         row.col(|ui| {
-                            pintar_fundo_celula(ui, cor_fundo);
+                            pintar_fundo_celula(ui, cor_fundo, selecionada);
                             ui.label(&d.tipo);
                         });
                         row.col(|ui| {
-                            pintar_fundo_celula(ui, cor_fundo);
+                            pintar_fundo_celula(ui, cor_fundo, selecionada);
                             ui.label(&d.prioridade);
                         });
                         row.col(|ui| {
-                            pintar_fundo_celula(ui, cor_fundo);
+                            pintar_fundo_celula(ui, cor_fundo, selecionada);
                             ui.label(&d.status);
                         });
                         row.col(|ui| {
-                            pintar_fundo_celula(ui, cor_fundo);
+                            pintar_fundo_celula(ui, cor_fundo, selecionada);
                             ui.label(&d.responsavel);
                         });
                         row.col(|ui| {
-                            pintar_fundo_celula(ui, cor_fundo);
+                            pintar_fundo_celula(ui, cor_fundo, selecionada);
                             ui.label(&d.processo_sei);
                         });
                         row.col(|ui| {
-                            pintar_fundo_celula(ui, cor_fundo);
+                            pintar_fundo_celula(ui, cor_fundo, selecionada);
                             ui.label(servicos::formatar_data_br(
                                 d.recebido_em.as_deref().unwrap_or(""),
                             ));
                         });
                         row.col(|ui| {
-                            pintar_fundo_celula(ui, cor_fundo);
-                            ui.label(servicos::formatar_data_br(d.prazo.as_deref().unwrap_or("")));
-                        });
-                        row.col(|ui| {
-                            pintar_fundo_celula(ui, cor_fundo);
+                            pintar_fundo_celula(ui, cor_fundo, selecionada);
                             let (texto, cor) = match d.situacao_prazo.as_str() {
                                 "atrasada" => ("Atrasada", egui::Color32::from_rgb(220, 53, 69)),
                                 "vencendo" => {
@@ -657,16 +680,68 @@ impl GestaoDemandasApp {
                             ui.colored_label(cor, texto);
                         });
 
+                        // Clicar na linha apenas seleciona o registro, que é
+                        // detalhado no painel inferior.
                         if row.response().clicked() {
-                            id_para_editar = Some(d.id.unwrap_or(0));
+                            id_para_selecionar = Some(d.id.unwrap_or(0));
                         }
                     });
                 }
             });
 
+        if let Some(id) = id_para_selecionar {
+            self.demanda_selecionada = Some(id);
+        }
         if let Some(id) = id_para_editar {
+            self.demanda_selecionada = Some(id);
             self.abrir_modal_edicao(id);
         }
+    }
+
+    /// Painel inferior: detalha a demanda selecionada na tabela, mostrando o
+    /// prazo interno, o prazo externo e o entregável esperado.
+    fn desenhar_detalhes(&mut self, ui: &mut egui::Ui) {
+        let selecionada = self
+            .demanda_selecionada
+            .and_then(|id| self.demandas.iter().find(|d| d.id == Some(id)).cloned());
+
+        let Some(d) = selecionada else {
+            ui.add_space(8.0);
+            ui.weak(
+                "Selecione uma demanda na tabela para ver o prazo interno, o prazo externo \
+                 e o entregável esperado.",
+            );
+            return;
+        };
+
+        ui.horizontal(|ui| {
+            ui.strong(format!("Demanda #{} — {}", d.id.unwrap_or(0), d.titulo));
+            ui.label(egui::RichText::new(format!("({} · {})", d.ente, d.status)).weak());
+        });
+        ui.separator();
+
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Prazo Interno:").strong());
+            ui.label(servicos::formatar_data_br(
+                d.prazo_interno.as_deref().unwrap_or(""),
+            ));
+            ui.add_space(24.0);
+            ui.label(egui::RichText::new("Prazo Externo:").strong());
+            ui.label(servicos::formatar_data_br(d.prazo.as_deref().unwrap_or("")));
+        });
+        ui.separator();
+
+        ui.label(egui::RichText::new("Entregável Esperado").strong());
+
+        // O entregável ocupa todo o espaço restante do painel.
+        let altura_campo = (ui.available_height() - 8.0).max(80.0);
+        let mut entregavel = d.entregavel.clone();
+        ui.add_sized(
+            [ui.available_width(), altura_campo],
+            egui::TextEdit::multiline(&mut entregavel)
+                .desired_width(f32::INFINITY)
+                .interactive(false),
+        );
     }
 
     fn desenhar_modal(&mut self, ctx: &egui::Context) {
@@ -686,11 +761,31 @@ impl GestaoDemandasApp {
         let mut anexo_para_adicionar: Option<std::path::PathBuf> = None;
         let mut anexo_para_abrir: Option<String> = None;
 
+        // O modal de edição é fixado no centro da tela (ancorado ao centro da
+        // área visível). O pivô central também faz com que o redimensionamento
+        // mantenha a janela sempre centralizada.
+        //
+        // O modal usa a mesma aparência do restante do app, porém com a fonte
+        // 1 ponto maior em todo o seu conteúdo (inclusive o título da janela).
+        let estilo_padrao = ctx.style();
+        let mut estilo_modal = (*estilo_padrao).clone();
+        for fonte in estilo_modal.text_styles.values_mut() {
+            fonte.size += 1.0;
+        }
+        ctx.set_style(estilo_modal);
+
+        // A janela é maior que a original, mas nunca ultrapassa a área
+        // visível da tela (evita cortar os botões de salvar/cancelar).
+        let tela = ctx.screen_rect();
+        let largura = (tela.width() - 60.0).clamp(480.0, 880.0);
+        let altura = (tela.height() - 50.0).clamp(380.0, 740.0);
+
         egui::Window::new(titulo)
             .open(&mut aberto)
             .collapsible(false)
             .resizable(true)
-            .default_size([680.0, 560.0])
+            .default_size([largura, altura])
+            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .show(ctx, |ui| {
                 let modal = self.modal.as_mut().unwrap();
 
@@ -711,7 +806,7 @@ impl GestaoDemandasApp {
                 ui.separator();
 
                 egui::ScrollArea::vertical()
-                    .max_height(420.0)
+                    .max_height((altura - 140.0).clamp(220.0, 560.0))
                     .show(ui, |ui| match modal.aba {
                         Aba::Geral => Self::desenhar_aba_geral(ui, modal, &self.opcoes),
                         Aba::Anexos => {
@@ -783,6 +878,9 @@ impl GestaoDemandasApp {
                 });
             });
 
+        // Restaura o estilo padrão do app para o restante da interface.
+        ctx.set_style(estilo_padrao);
+
         if let Some(caminho) = anexo_para_adicionar {
             self.adicionar_anexo_modal(caminho);
         }
@@ -804,22 +902,32 @@ impl GestaoDemandasApp {
             .spacing([12.0, 8.0])
             .show(ui, |ui| {
                 ui.label("Título *");
-                ui.add(egui::TextEdit::singleline(&mut modal.form.titulo).desired_width(420.0));
+                ui.add(egui::TextEdit::singleline(&mut modal.form.titulo).desired_width(560.0));
                 ui.end_row();
 
                 ui.label("Ente Federativo");
-                egui::ComboBox::from_id_salt("campo-ente")
-                    .selected_text(if modal.form.ente.is_empty() {
-                        "(Selecione)"
-                    } else {
-                        &modal.form.ente
-                    })
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut modal.form.ente, String::new(), "(Selecione)");
-                        for e in &opcoes.entes {
-                            ui.selectable_value(&mut modal.form.ente, e.clone(), e);
-                        }
-                    });
+                // Campo de texto livre: aceita qualquer nome digitado. O
+                // seletor ao lado apenas sugere entes já catalogados.
+                let mut ente_sugerido: Option<String> = None;
+                ui.horizontal(|ui| {
+                    ui.add(
+                        egui::TextEdit::singleline(&mut modal.form.ente)
+                            .desired_width(470.0)
+                            .hint_text("Nome do ente federativo"),
+                    );
+                    egui::ComboBox::from_id_salt("campo-ente-sugestoes")
+                        .selected_text("Sugestões")
+                        .show_ui(ui, |ui| {
+                            for e in &opcoes.entes {
+                                if ui.selectable_label(false, e.as_str()).clicked() {
+                                    ente_sugerido = Some(e.clone());
+                                }
+                            }
+                        });
+                });
+                if let Some(ente) = ente_sugerido {
+                    modal.form.ente = ente;
+                }
                 ui.end_row();
 
                 ui.label("Tipo");
@@ -854,7 +962,7 @@ impl GestaoDemandasApp {
 
                 ui.label("Responsável");
                 ui.add(
-                    egui::TextEdit::singleline(&mut modal.form.responsavel).desired_width(300.0),
+                    egui::TextEdit::singleline(&mut modal.form.responsavel).desired_width(420.0),
                 );
                 ui.end_row();
 
@@ -938,19 +1046,40 @@ impl GestaoDemandasApp {
 
 impl eframe::App for GestaoDemandasApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.desenhar_header(ctx);
+        // Cabeçalho com os botões de ação.
+        egui::TopBottomPanel::top("header").show(ctx, |ui| self.desenhar_header(ui));
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        // Estatísticas e filtros.
+        egui::TopBottomPanel::top("filtros").show(ctx, |ui| {
             self.desenhar_estatisticas(ui);
-            ui.add_space(10.0);
+            ui.add_space(8.0);
             self.desenhar_filtros(ui);
-            ui.add_space(10.0);
-            egui::ScrollArea::horizontal()
-                .auto_shrink([false, false])
-                .show(ui, |ui| {
-                    self.desenhar_tabela(ui);
-                });
         });
+
+        // A tela é dividida em duas: a relação de demandas fica na parte de
+        // cima (2/3 da altura disponível) e o detalhamento da demanda
+        // selecionada na parte de baixo (1/3).
+        let disponível = ctx.available_rect().height().max(260.0);
+        let altura_tabela = (disponível * 0.65).max(160.0);
+        let altura_detalhes = disponível - altura_tabela;
+
+        egui::TopBottomPanel::top("tabela-demandas")
+            .exact_height(altura_tabela)
+            .show(ctx, |ui| {
+                egui::ScrollArea::horizontal()
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        self.desenhar_tabela(ui);
+                    });
+            });
+
+        egui::TopBottomPanel::bottom("detalhes-demanda")
+            .exact_height(altura_detalhes)
+            .show(ctx, |ui| {
+                self.desenhar_detalhes(ui);
+            });
+
+        egui::CentralPanel::default().show(ctx, |_ui| {});
 
         self.desenhar_modal(ctx);
         self.desenhar_toasts(ctx);
