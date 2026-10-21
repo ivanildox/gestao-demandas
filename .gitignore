@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Rust / Cargo
+target/
+src-tauri/target/
+**/*.rs.bk
+
+# Executável compilado (distribuído via GitHub Releases)
+gestao_demandas.exe
+
+# Dados locais
+dados/
+
+# Configurações locais de agentes/ferramentas de IA
+.agents/
+.gemini/
