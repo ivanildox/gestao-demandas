@@ -28,6 +28,12 @@ fn cor_status(status: &str) -> egui::Color32 {
     }
 }
 
+/// Tamanho de fonte do campo "Entregável Esperado": dois pontos acima do
+/// tamanho padrão do corpo de texto da interface.
+fn tamanho_fonte_entregavel(ui: &egui::Ui) -> f32 {
+    ui.style().text_styles[&egui::TextStyle::Body].size + 2.0
+}
+
 /// Pinta o fundo da célula atual com a cor indicada, preenchendo todo o
 /// retângulo disponível antes de desenhar o conteúdo por cima.
 /// Linhas selecionadas recebem um tom azul por cima da cor de status.
@@ -731,7 +737,12 @@ impl GestaoDemandasApp {
         });
         ui.separator();
 
-        ui.label(egui::RichText::new("Entregável Esperado").strong());
+        let tamanho_fonte = tamanho_fonte_entregavel(ui);
+        ui.label(
+            egui::RichText::new("Entregável Esperado")
+                .strong()
+                .size(tamanho_fonte),
+        );
 
         // O entregável ocupa todo o espaço restante do painel.
         let altura_campo = (ui.available_height() - 8.0).max(80.0);
@@ -739,6 +750,7 @@ impl GestaoDemandasApp {
         ui.add_sized(
             [ui.available_width(), altura_campo],
             egui::TextEdit::multiline(&mut entregavel)
+                .font(egui::FontId::proportional(tamanho_fonte))
                 .desired_width(f32::INFINITY)
                 .interactive(false),
         );
@@ -1006,9 +1018,11 @@ impl GestaoDemandasApp {
         );
 
         ui.add_space(8.0);
-        ui.label("Entregável Esperado");
+        let tamanho_fonte = tamanho_fonte_entregavel(ui);
+        ui.label(egui::RichText::new("Entregável Esperado").size(tamanho_fonte));
         ui.add(
             egui::TextEdit::multiline(&mut modal.form.entregavel)
+                .font(egui::FontId::proportional(tamanho_fonte))
                 .desired_rows(3)
                 .desired_width(f32::INFINITY),
         );
