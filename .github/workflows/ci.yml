@@ -13,20 +13,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Instalar toolchain Rust (MSVC)
-        uses: dtolnay/rust-toolchain@stable
+      - name: Configurar Python
+        uses: actions/setup-python@v5
         with:
-          targets: x86_64-pc-windows-msvc
+          python-version: "3.13"
+          cache: pip
 
-      - name: Cache do Cargo
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: cargo check
-        working-directory: src-tauri
-        run: cargo check --verbose
+      - name: Testes do núcleo
+        run: python -m unittest discover -s testes -v
 
-      - name: cargo test
-        working-directory: src-tauri
-        run: cargo test --verbose
+      - name: Testes de integração
+        run: python testes/test_integracao.py

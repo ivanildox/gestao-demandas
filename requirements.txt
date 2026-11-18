@@ -1,0 +1,2 @@
+# Dependências do Gestão de Demandas (Python + PyQt6)
+PyQt6==6.11.0

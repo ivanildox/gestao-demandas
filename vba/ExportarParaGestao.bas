@@ -7,16 +7,110 @@ Option Explicit
 '
 ' O que faz:
 '   - exporta assunto, remetente, data, corpo e anexos do e-mail selecionado
-'   - grava um .json em INBOX_PATH (e os anexos numa subpasta)
+'   - grava um .json na pasta de entrada (e os anexos numa subpasta)
 '   - o sistema Python importa esses pacotes pelo botao "Importar e-mails"
 '
 ' Nao envia, nao responde e nao altera o e-mail.
 ' =====================================================================
 
-' Pasta de entrada do sistema (deve existir ou sera criada pelo Python).
-Private Const INBOX_PATH As String = "C:\Users\ivani\OneDrive\Downloads\Projetos\Gestao_Demandas\dados\inbox"
+' Pasta de dados do sistema (a fila fica em <pasta de dados>\inbox).
+'
+' A macro NAO tem caminho fixo: usa a mesma pasta que o programa estiver
+' usando, inclusive em outro computador. Ordem de resolucao:
+'   1. variavel de ambiente GESTAO_DEMANDAS_DADOS (mesma variavel do programa);
+'   2. DADOS_FIXO, se voce preencher esta constante (forca um caminho manual);
+'   3. registro gravado pelo programa a cada execucao:
+'      %LOCALAPPDATA%\Gestao de Demandas\ultima_pasta.txt
+'      (funciona em qualquer pasta e computador - basta abrir o programa uma
+'      vez depois de copia-lo);
+'   4. %LOCALAPPDATA%\Gestao de Demandas\dados (padrao do programa quando nao
+'      ha pasta de dados ao lado do executavel).
+'
+' Para conferir o caminho em uso, rode a macro MostrarPastaEntrada.
+Private Const DADOS_FIXO As String = ""
 Private Const TITULO As String = "Gestao de Demandas"
 Private Const PR_SMTP As String = "http://schemas.microsoft.com/mapi/proptag/0x39FE001E"
+Private Const ARQUIVO_REGISTRO As String = "\Gestao de Demandas\ultima_pasta.txt"
+
+' Pasta padrao por usuario, usada quando nao ha melhor referencia.
+Private Function PastaPadraoUsuario() As String
+    Dim base As String
+    base = Environ$("LOCALAPPDATA")
+    If Len(base) = 0 Then base = Environ$("APPDATA")
+    If Len(base) = 0 Then base = Environ$("USERPROFILE")
+    PastaPadraoUsuario = base & "\Gestao de Demandas\dados"
+End Function
+
+' Le a pasta que o programa registrou na ultima execucao.
+Private Function PastaRegistrada() As String
+    Dim caminho As String
+    Dim st As Object
+    Dim texto As String
+
+    caminho = Environ$("LOCALAPPDATA")
+    If Len(caminho) = 0 Then Exit Function
+    caminho = caminho & ARQUIVO_REGISTRO
+    If Dir$(caminho) = "" Then Exit Function
+
+    On Error GoTo SemRegistro
+    Set st = CreateObject("ADODB.Stream")
+    st.Type = 2                 ' adTypeText
+    st.Charset = "utf-8"
+    st.Open
+    st.LoadFromFile caminho
+    texto = st.ReadText(-1)     ' adReadAll
+    st.Close
+    Set st = Nothing
+    On Error GoTo 0
+
+    PastaRegistrada = Trim$(texto)
+SemRegistro:
+End Function
+
+' De onde veio o caminho (usado apenas na mensagem de diagnostico).
+Private Function OrigemPasta() As String
+    If Len(Trim$(Environ$("GESTAO_DEMANDAS_DADOS"))) > 0 Then
+        OrigemPasta = "variavel GESTAO_DEMANDAS_DADOS"
+    ElseIf Len(DADOS_FIXO) > 0 Then
+        OrigemPasta = "constante DADOS_FIXO da macro"
+    ElseIf Len(PastaRegistrada()) > 0 Then
+        OrigemPasta = "registro do programa"
+    Else
+        OrigemPasta = "padrao do usuario"
+    End If
+End Function
+
+' Retorna a pasta de dados em uso (sem barra final).
+Private Function PastaDados() As String
+    Dim base As String
+    base = Trim$(Environ$("GESTAO_DEMANDAS_DADOS"))
+    If Len(base) = 0 Then base = Trim$(DADOS_FIXO)
+    If Len(base) = 0 Then base = PastaRegistrada()
+    If Len(base) = 0 Then base = PastaPadraoUsuario()
+    Do While Len(base) > 0 And Right$(base, 1) = "\"
+        base = Left$(base, Len(base) - 1)
+    Loop
+    PastaDados = base
+End Function
+
+' Retorna a pasta de entrada (fila) em uso.
+Private Function InboxPath() As String
+    InboxPath = PastaDados() & "\inbox"
+End Function
+
+' Mostra onde a macro esta gravando (util quando o programa foi copiado).
+Public Sub MostrarPastaEntrada()
+    Dim fso As Object
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    MsgBox "Pasta de dados em uso:" & vbCrLf & PastaDados() & vbCrLf & vbCrLf & _
+           "Origem: " & OrigemPasta() & vbCrLf & _
+           "Fila de e-mails:" & vbCrLf & InboxPath() & vbCrLf & vbCrLf & _
+           "Existe: " & IIf(fso.FolderExists(InboxPath()), "sim", "nao"), _
+           vbInformation, TITULO
+    If fso.FolderExists(InboxPath()) Then
+        Shell "explorer.exe """ & InboxPath() & """", vbNormalFocus
+    End If
+End Sub
 
 Public Sub EnviarParaGestao()
     On Error GoTo ErrHandler
@@ -25,11 +119,17 @@ Public Sub EnviarParaGestao()
     Set mail = SelecionarEmail()
     If mail Is Nothing Then Exit Sub
 
+    Dim inbox As String
+    inbox = InboxPath()
+
     Dim fso As Object
     Set fso = CreateObject("Scripting.FileSystemObject")
-    If Not fso.FolderExists(INBOX_PATH) Then
-        MsgBox "Pasta de entrada nao encontrada:" & vbCrLf & INBOX_PATH & vbCrLf & vbCrLf & _
-               "Ajuste a constante INBOX_PATH no codigo da macro.", vbCritical, TITULO
+    If Not fso.FolderExists(inbox) Then
+        MsgBox "Pasta de entrada nao encontrada:" & vbCrLf & inbox & vbCrLf & vbCrLf & _
+               "Abra o Gestao de Demandas uma vez neste computador: ele cria a " & _
+               "pasta e avisa a macro onde ela fica." & vbCrLf & vbCrLf & _
+               "(Se preferir fixar o caminho, preencha DADOS_FIXO na macro ou a " & _
+               "variavel GESTAO_DEMANDAS_DADOS.)", vbCritical, TITULO
         Exit Sub
     End If
 
@@ -37,7 +137,7 @@ Public Sub EnviarParaGestao()
     idEnvio = Format$(Now, "yyyymmdd_hhnnss")
 
     Dim pastaAnexos As String
-    pastaAnexos = INBOX_PATH & "\" & idEnvio & "_anexos"
+    pastaAnexos = inbox & "\" & idEnvio & "_anexos"
 
     Dim anexosJson As String
     anexosJson = SalvarAnexos(mail, pastaAnexos, fso)
@@ -60,11 +160,12 @@ Public Sub EnviarParaGestao()
     json = json & "  ""anexos"": [" & anexosJson & "]" & vbLf
     json = json & "}"
 
-    GravarUtf8 INBOX_PATH & "\" & idEnvio & ".json", json
+    GravarUtf8 inbox & "\" & idEnvio & ".json", json
 
     MsgBox "E-mail enviado para a fila do sistema." & vbCrLf & vbCrLf & _
            "Assunto: " & SafeText(mail.Subject) & vbCrLf & _
-           "Anexos: " & mail.Attachments.Count & vbCrLf & vbCrLf & _
+           "Anexos: " & mail.Attachments.Count & vbCrLf & _
+           "Pasta: " & inbox & vbCrLf & vbCrLf & _
            "Abra o sistema e clique em 'Importar e-mails'.", vbInformation, TITULO
     Exit Sub
 
